@@ -1,4 +1,5 @@
 import PremierLeagueTable from './components/PremierLeagueTable'
+import DataChart from './components/DataChart'
 
 function App() {
   return (
@@ -10,6 +11,7 @@ function App() {
       </nav>
       <main>
         <PremierLeagueTable />
+        <DataChart />
       </main>
     </div>
   )
