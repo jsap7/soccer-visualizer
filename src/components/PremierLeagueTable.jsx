@@ -196,6 +196,95 @@ const Legend = () => (
   </div>
 );
 
+const TrendIndicator = ({ form }) => {
+  // Calculate trend based on last 5 matches with sophisticated weighting
+  const calculateTrend = () => {
+    if (!form || form.length === 0) return 'neutral';
+    
+    // Reverse form to have most recent first
+    const recentForm = [...form].reverse();
+    
+    // Initialize score (0 is neutral)
+    let trendScore = 0;
+    let consecutiveLosses = 0;
+    let consecutiveWins = 0;
+    
+    recentForm.forEach((result, index) => {
+      const isRecent = index < 3; // More weight to most recent 3 games
+      
+      switch (result) {
+        case 'W':
+          consecutiveLosses = 0;
+          consecutiveWins++;
+          // Winning streak bonus
+          trendScore += isRecent ? 2 : 1;
+          if (consecutiveWins > 1) trendScore += 1;
+          break;
+          
+        case 'L':
+          consecutiveWins = 0;
+          consecutiveLosses++;
+          // Loss penalty (heavier for recent games and consecutive losses)
+          trendScore -= isRecent ? 3 : 2;
+          if (consecutiveLosses > 1) trendScore -= 2;
+          break;
+          
+        case 'D':
+          // Draw after wins is neutral to slightly negative
+          // Draw after losses is slightly positive (stopping the rot)
+          if (consecutiveLosses > 0) {
+            trendScore += 0.5;
+            consecutiveLosses = 0;
+          } else if (consecutiveWins > 0) {
+            trendScore -= 0.5;
+            consecutiveWins = 0;
+          }
+          break;
+          
+        default: // 'PP'
+          // Postponed games don't affect trend
+          break;
+      }
+    });
+
+    // Determine trend based on final score
+    if (trendScore >= 2) return 'up';
+    if (trendScore <= -2) return 'down';
+    return 'neutral';
+  };
+
+  const trend = calculateTrend();
+  
+  const getArrow = () => {
+    switch (trend) {
+      case 'up':
+        return (
+          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        );
+      case 'down':
+        return (
+          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
+          </svg>
+        );
+    }
+  };
+
+  return (
+    <div className="flex items-center ml-2" title={`Form trend: ${trend}`}>
+      {getArrow()}
+    </div>
+  );
+};
+
 const PremierLeagueTable = () => {
   const [tableData, setTableData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -295,17 +384,20 @@ const PremierLeagueTable = () => {
                     <td className={`px-4 py-3 text-center border-r ${COLORS.divider} ${goalDiffColor} font-medium`}>{goalDiff}</td>
                     <td className={`px-4 py-3 text-center ${FONT_WEIGHTS.bold} border-r ${COLORS.divider}`}>{team.points}</td>
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
-                      <div className="flex items-center justify-center gap-0.5">
-                        {team.form.map((result, index) => (
-                          <FormCircle 
-                            key={index} 
-                            result={result} 
-                            isMostRecent={index === team.form.length - 1}
-                            match={team.formMatches?.[index]}
-                            teamId={team.team.id}
-                            position={position}
-                          />
-                        ))}
+                      <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-0.5">
+                          {team.form.map((result, index) => (
+                            <FormCircle 
+                              key={index} 
+                              result={result} 
+                              isMostRecent={index === team.form.length - 1}
+                              match={team.formMatches?.[index]}
+                              teamId={team.team.id}
+                              position={position}
+                            />
+                          ))}
+                        </div>
+                        <TrendIndicator form={team.form} />
                       </div>
                     </td>
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
