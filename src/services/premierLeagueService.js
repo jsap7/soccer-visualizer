@@ -15,6 +15,7 @@ export const calculateTeamStats = (matches, teamId) => {
     goalsAgainst: 0,
     points: 0,
     form: [],
+    formMatches: [],
     nextMatch: null,
     lastMatch: null
   };
@@ -69,15 +70,15 @@ export const calculateTeamStats = (matches, teamId) => {
   //--------------------------------------------------
   // Update Form and Determine Next/Last Match
   //--------------------------------------------------
-  stats.form = finishedMatches
-    .slice(-5)
-    .map(match => {
-      if (match.status === 'POSTPONED') return 'PP';
-      const isHome = match.homeTeam.id === teamId;
-      if (match.score.winner === (isHome ? 'HOME_TEAM' : 'AWAY_TEAM')) return 'W';
-      if (match.score.winner === 'DRAW') return 'D';
-      return 'L';
-    });
+  const lastFiveMatches = finishedMatches.slice(-5);
+  stats.formMatches = lastFiveMatches;
+  stats.form = lastFiveMatches.map(match => {
+    if (match.status === 'POSTPONED') return 'PP';
+    const isHome = match.homeTeam.id === teamId;
+    if (match.score.winner === (isHome ? 'HOME_TEAM' : 'AWAY_TEAM')) return 'W';
+    if (match.score.winner === 'DRAW') return 'D';
+    return 'L';
+  });
 
   // Find the next scheduled match
   stats.nextMatch = teamMatches
