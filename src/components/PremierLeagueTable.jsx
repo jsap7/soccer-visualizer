@@ -1,289 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchPremierLeagueData } from '../services/premierLeagueService';
-
-// Font sizes
-const TEXT_SIZES = {
-  xs: 'text-xs',
-  sm: 'text-sm',
-  base: 'text-base',
-  lg: 'text-lg',
-  xl: 'text-xl',
-  '2xl': 'text-2xl',
-  'small': 'text-[13px]'
-};
-
-// Font weights
-const FONT_WEIGHTS = {
-  normal: 'font-normal',
-  medium: 'font-medium',
-  semibold: 'font-semibold',
-  bold: 'font-bold'
-};
-
-// Colors
-const COLORS = {
-  header: 'bg-[#2f2f2f]',
-  divider: 'border-gray-100',
-  champions: 'before:bg-blue-500',
-  europa: 'before:bg-green-500',
-  conference: 'before:bg-orange-500',
-  relegation: 'before:bg-red-500'
-};
-
-const MatchTooltip = ({ match, teamId, position }) => {
-  if (!match) return null;
-  
-  const isHome = match.homeTeam.id === teamId;
-  const homeTeam = match.homeTeam;
-  const awayTeam = match.awayTeam;
-  const matchDate = new Date(match.utcDate);
-  const homeGoals = match.score.fullTime.home;
-  const awayGoals = match.score.fullTime.away;
-  
-  const getScoreStyle = () => {
-    if (match.status === 'POSTPONED') return 'text-gray-400';
-    const teamGoals = isHome ? homeGoals : awayGoals;
-    const opponentGoals = isHome ? awayGoals : homeGoals;
-    if (teamGoals > opponentGoals) return 'text-green-400';
-    if (teamGoals < opponentGoals) return 'text-red-400';
-    return 'text-gray-300';
-  };
-
-  // For top 4 teams, show tooltip below
-  const isTopTeam = position <= 4;
-  const tooltipBaseClasses = `absolute ${isTopTeam ? 'top-full mt-2' : 'bottom-full mb-2'} left-1/2 -translate-x-1/2 bg-gray-800 text-white rounded-lg p-3 text-sm shadow-xl w-64 z-50 transform transition-opacity duration-150`;
-
-  return (
-    <div className={tooltipBaseClasses}>
-      <div className="text-center mb-2 text-gray-300 text-xs">
-        {matchDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-      </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <div className="flex flex-col items-center gap-1">
-          <img src={homeTeam.crest} alt={homeTeam.name} className="w-6 h-6" />
-          <span className="text-xs text-center">{homeTeam.shortName || homeTeam.name}</span>
-        </div>
-        <div className={`font-bold text-lg ${getScoreStyle()}`}>
-          {homeGoals !== null ? `${homeGoals} - ${awayGoals}` : 'PP'}
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <img src={awayTeam.crest} alt={awayTeam.name} className="w-6 h-6" />
-          <span className="text-xs text-center">{awayTeam.shortName || awayTeam.name}</span>
-        </div>
-      </div>
-      <div className={`absolute ${isTopTeam ? 'top-[-6px]' : 'bottom-[-6px]'} left-1/2 -translate-x-1/2 w-3 h-3 bg-gray-800 rotate-45`}></div>
-    </div>
-  );
-};
-
-const FormCircle = ({ result, isMostRecent, match, teamId, position }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const baseClasses = `w-5 h-5 rounded-full flex items-center justify-center ${TEXT_SIZES.xs} ${FONT_WEIGHTS.bold} text-white cursor-pointer transition-transform duration-150 hover:scale-110`;
-  const lineColor = result === 'W' ? 'bg-green-500' : result === 'D' ? 'bg-gray-500' : result === 'L' ? 'bg-red-500' : 'bg-yellow-500';
-  
-  return (
-    <div 
-      className="relative flex flex-col items-center"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      <div className={`${baseClasses} ${lineColor}`}>
-        {result}
-      </div>
-      {isMostRecent && (
-        <div className={`w-5 h-1 ${lineColor} rounded-full mt-2 absolute bottom-[-5px]`}></div>
-      )}
-      {showTooltip && match && <MatchTooltip match={match} teamId={teamId} position={position} />}
-    </div>
-  );
-};
-
-const TeamName = ({ name, className = "" }) => {
-  // Use slightly smaller text for teams with longer names
-  const textSize = name.length > 15 ? TEXT_SIZES.small : TEXT_SIZES.sm;
-  
-  return (
-    <span className={`block whitespace-nowrap ${textSize} ${className}`}>
-      {name}
-    </span>
-  );
-};
-
-const NextMatch = ({ match, teamId }) => {
-  if (!match) return <div className="text-gray-500 w-full">No upcoming matches</div>;
-
-  const isHome = match.homeTeam.id === teamId;
-  const opponent = isHome ? match.awayTeam : match.homeTeam;
-  const matchDate = new Date(match.utcDate);
-  
-  return (
-    <div className="grid grid-cols-[48px_24px_1fr] items-center gap-1">
-      <div className={`${TEXT_SIZES.xs} text-gray-600`}>
-        {matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-      </div>
-      <div className={`${TEXT_SIZES.xs} ${FONT_WEIGHTS.medium} ${isHome ? 'text-green-600' : 'text-blue-600'} text-center`}>
-        {isHome ? 'H' : 'A'}
-      </div>
-      <div className="flex items-center gap-2">
-        <img 
-          src={opponent.crest} 
-          alt={opponent.name}
-          className="w-4 h-4 flex-shrink-0" 
-        />
-        <TeamName name={opponent.shortName || opponent.name} />
-      </div>
-    </div>
-  );
-};
-
-const LastMatch = ({ match, teamId }) => {
-  if (!match) return <div className="text-gray-500 w-full">No recent matches</div>;
-
-  const isHome = match.homeTeam.id === teamId;
-  const opponent = isHome ? match.awayTeam : match.homeTeam;
-  const matchDate = new Date(match.utcDate);
-  const goalsScored = isHome ? match.score.fullTime.home : match.score.fullTime.away;
-  const goalsConceded = isHome ? match.score.fullTime.away : match.score.fullTime.home;
-  
-  const getResultColor = () => {
-    if (goalsScored === null || goalsConceded === null) return '';
-    if (goalsScored > goalsConceded) return 'text-green-600';
-    if (goalsScored < goalsConceded) return 'text-red-600';
-    return 'text-gray-600';
-  };
-  
-  return (
-    <div className="grid grid-cols-[48px_24px_1fr_45px] items-center gap-1">
-      <div className={`${TEXT_SIZES.xs} text-gray-600`}>
-        {matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-      </div>
-      <div className={`${TEXT_SIZES.xs} ${FONT_WEIGHTS.medium} ${isHome ? 'text-green-600' : 'text-blue-600'} text-center`}>
-        {isHome ? 'H' : 'A'}
-      </div>
-      <div className="flex items-center gap-2">
-        <img 
-          src={opponent.crest} 
-          alt={opponent.name}
-          className="w-4 h-4 flex-shrink-0" 
-        />
-        <TeamName name={opponent.shortName || opponent.name} />
-      </div>
-      <div className={`${TEXT_SIZES.xs} ${FONT_WEIGHTS.medium} text-center ${getResultColor()}`}>
-        {goalsScored !== null && goalsConceded !== null ? `${goalsScored}-${goalsConceded}` : 'PP'}
-      </div>
-    </div>
-  );
-};
-
-const Legend = () => (
-  <div className="flex flex-wrap gap-4 justify-center mt-4 text-sm">
-    <div className="flex items-center gap-2">
-      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-      <span>Champions League</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-      <span>Europa League</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-      <span>Conference League</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-      <span>Relegation Zone</span>
-    </div>
-  </div>
-);
-
-const TrendIndicator = ({ form }) => {
-  // Calculate trend based on last 5 matches with sophisticated weighting
-  const calculateTrend = () => {
-    if (!form || form.length === 0) return 'neutral';
-    
-    // Reverse form to have most recent first
-    const recentForm = [...form].reverse();
-    
-    // Initialize score (0 is neutral)
-    let trendScore = 0;
-    let consecutiveLosses = 0;
-    let consecutiveWins = 0;
-    
-    recentForm.forEach((result, index) => {
-      const isRecent = index < 3; // More weight to most recent 3 games
-      
-      switch (result) {
-        case 'W':
-          consecutiveLosses = 0;
-          consecutiveWins++;
-          // Winning streak bonus
-          trendScore += isRecent ? 2 : 1;
-          if (consecutiveWins > 1) trendScore += 1;
-          break;
-          
-        case 'L':
-          consecutiveWins = 0;
-          consecutiveLosses++;
-          // Loss penalty (heavier for recent games and consecutive losses)
-          trendScore -= isRecent ? 3 : 2;
-          if (consecutiveLosses > 1) trendScore -= 2;
-          break;
-          
-        case 'D':
-          // Draw after wins is neutral to slightly negative
-          // Draw after losses is slightly positive (stopping the rot)
-          if (consecutiveLosses > 0) {
-            trendScore += 0.5;
-            consecutiveLosses = 0;
-          } else if (consecutiveWins > 0) {
-            trendScore -= 0.5;
-            consecutiveWins = 0;
-          }
-          break;
-          
-        default: // 'PP'
-          // Postponed games don't affect trend
-          break;
-      }
-    });
-
-    // Determine trend based on final score
-    if (trendScore >= 2) return 'up';
-    if (trendScore <= -2) return 'down';
-    return 'neutral';
-  };
-
-  const trend = calculateTrend();
-  
-  const getArrow = () => {
-    switch (trend) {
-      case 'up':
-        return (
-          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-          </svg>
-        );
-      case 'down':
-        return (
-          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
-          </svg>
-        );
-    }
-  };
-
-  return (
-    <div className="flex items-center ml-2" title={`Form trend: ${trend}`}>
-      {getArrow()}
-    </div>
-  );
-};
+import { TEXT_SIZES, FONT_WEIGHTS, COLORS } from './table-components/constants';
+import FormIndicator from './table-components/FormIndicator';
+import TeamCell from './table-components/TeamCell';
+import MatchCell from './table-components/MatchCell';
+import Legend from './table-components/Legend';
+import TableHeader from './table-components/TableHeader';
 
 const PremierLeagueTable = () => {
   const [tableData, setTableData] = useState([]);
@@ -336,23 +58,7 @@ const PremierLeagueTable = () => {
       <div className="flex justify-center">
         <div className="overflow-x-auto rounded-lg shadow">
           <table className={`bg-white ${TEXT_SIZES.sm} border-collapse relative`}>
-            <thead className={`${COLORS.header} text-white`}>
-              <tr>
-                <th className="px-4 py-3 text-center w-12">#</th>
-                <th className="px-4 py-3 text-left w-64">Team</th>
-                <th className="px-4 py-3 text-center w-12">MP</th>
-                <th className="px-4 py-3 text-center w-12">W</th>
-                <th className="px-4 py-3 text-center w-12">D</th>
-                <th className="px-4 py-3 text-center w-12">L</th>
-                <th className="px-4 py-3 text-center w-12">GF</th>
-                <th className="px-4 py-3 text-center w-12">GA</th>
-                <th className="px-4 py-3 text-center w-12">GD</th>
-                <th className="px-4 py-3 text-center w-12">Pts</th>
-                <th className="px-4 py-3 text-center w-40">Form</th>
-                <th className="px-4 py-3 text-left w-72">Last Match</th>
-                <th className="px-4 py-3 text-left w-64">Next Match</th>
-              </tr>
-            </thead>
+            <TableHeader />
             <tbody className="text-gray-700">
               {tableData.map((team, index) => {
                 const position = index + 1;
@@ -366,14 +72,7 @@ const PremierLeagueTable = () => {
                       {position}
                     </td>
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
-                      <div className="flex items-center gap-3">
-                        <img 
-                          src={team.team.crest} 
-                          alt={team.team.name} 
-                          className="w-5 h-5 flex-shrink-0"
-                        />
-                        <TeamName name={team.team.name} />
-                      </div>
+                      <TeamCell team={team.team} />
                     </td>
                     <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.played}</td>
                     <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.won}</td>
@@ -384,27 +83,18 @@ const PremierLeagueTable = () => {
                     <td className={`px-4 py-3 text-center border-r ${COLORS.divider} ${goalDiffColor} font-medium`}>{goalDiff}</td>
                     <td className={`px-4 py-3 text-center ${FONT_WEIGHTS.bold} border-r ${COLORS.divider}`}>{team.points}</td>
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
-                      <div className="flex items-center justify-center">
-                        <div className="flex items-center justify-center gap-0.5">
-                          {team.form.map((result, index) => (
-                            <FormCircle 
-                              key={index} 
-                              result={result} 
-                              isMostRecent={index === team.form.length - 1}
-                              match={team.formMatches?.[index]}
-                              teamId={team.team.id}
-                              position={position}
-                            />
-                          ))}
-                        </div>
-                        <TrendIndicator form={team.form} />
-                      </div>
+                      <FormIndicator 
+                        form={team.form} 
+                        formMatches={team.formMatches} 
+                        teamId={team.team.id}
+                        position={position}
+                      />
                     </td>
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
-                      <LastMatch match={team.lastMatch} teamId={team.team.id} />
+                      <MatchCell match={team.lastMatch} teamId={team.team.id} type="last" />
                     </td>
                     <td className="px-4 py-3">
-                      <NextMatch match={team.nextMatch} teamId={team.team.id} />
+                      <MatchCell match={team.nextMatch} teamId={team.team.id} type="next" />
                     </td>
                   </tr>
                 );
