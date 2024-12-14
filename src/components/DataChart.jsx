@@ -12,6 +12,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import axios from 'axios';
 import TeamSelector from './chart-components/TeamSelector';
+import TeamStats from './TeamStats';
 import { teamColors } from './chart-components/constants';
 import { processMatchData } from '../utils/chartDataProcessor';
 import { processPointsData } from '../utils/pointsDataProcessor';
@@ -34,12 +35,14 @@ const DataChart = () => {
   const [error, setError] = useState(null);
   const [selectedTeams, setSelectedTeams] = useState(new Set());
   const [viewType, setViewType] = useState('points');
+  const [matches, setMatches] = useState([]);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const matchesResponse = await axios.get('/api/v4/competitions/PL/matches');
         const matches = matchesResponse.data.matches;
+        setMatches(matches);
         
         const basicData = processMatchData(matches);
         const pointsData = processPointsData(matches);
@@ -320,19 +323,18 @@ const DataChart = () => {
 
   return (
     <div className="chart-container" style={{ 
-      height: '80vh', 
       width: '100%', 
       padding: '20px',
-      marginLeft: '20px'  // Add margin to prevent cutoff
+      marginLeft: '20px'
     }}>
       <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>
         League {viewType === 'points' ? 'Points' : 'Positions'} Progression
       </h2>
       <ViewSelector />
       <div style={{ 
-        height: 'calc(100% - 160px)', 
+        height: '80vh', 
         marginBottom: '20px',
-        marginLeft: '20px'  // Add margin to prevent cutoff
+        marginLeft: '20px'
       }}>
         <Line options={getChartOptions()} data={getChartData()} />
       </div>
@@ -343,6 +345,10 @@ const DataChart = () => {
         onTeamToggle={handleTeamToggle}
         onSelectAll={handleSelectAll}
         onClearAll={handleClearAll}
+      />
+      <TeamStats 
+        matches={matches}
+        selectedTeams={selectedTeams}
       />
     </div>
   );
