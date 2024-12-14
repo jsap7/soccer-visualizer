@@ -8,7 +8,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: VITE_API_KEY
-        sync: false
+        value: 64fce2370ab54345b892c429472e3845
     headers:
       - path: /*
         name: Cache-Control

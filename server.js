@@ -2,6 +2,7 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync, readdirSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,7 +36,7 @@ const apiProxy = createProxyMiddleware({
   onProxyReq: (proxyReq, req) => {
     // Log the original request URL and headers
     console.log('Proxying request:', req.url);
-    console.log('API Key present:', !!process.env.VITE_API_KEY);
+    console.log('API Key:', process.env.VITE_API_KEY ? '(set)' : '(not set)');
     
     if (!process.env.VITE_API_KEY) {
       console.error('API Key is missing!');
@@ -80,10 +81,30 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
+// Load environment variables from .env file in production
+if (process.env.NODE_ENV === 'production') {
+  try {
+    const envFile = readFileSync('.env.production');
+    const envVars = envFile.toString().split('\n');
+    envVars.forEach(line => {
+      const [key, value] = line.split('=');
+      if (key && value) {
+        process.env[key.trim()] = value.trim();
+      }
+    });
+  } catch (err) {
+    console.log('No .env.production file found');
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log('Environment:', process.env.NODE_ENV);
-  console.log('API Key present:', !!process.env.VITE_API_KEY);
+  console.log('API Key:', process.env.VITE_API_KEY ? '(set)' : '(not set)');
   console.log('Current working directory:', process.cwd());
-  console.log('Directory contents:', require('fs').readdirSync(process.cwd()));
+  try {
+    console.log('Directory contents:', readdirSync(process.cwd()));
+  } catch (err) {
+    console.error('Error reading directory:', err);
+  }
 }); 
