@@ -75,25 +75,52 @@ const DataChart = () => {
         display: false
       },
       tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        titleColor: '#333',
+        bodyColor: '#666',
+        titleFont: {
+          size: 14,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 13
+        },
+        padding: 12,
+        boxPadding: 6,
+        borderColor: 'rgba(0,0,0,0.1)',
+        borderWidth: 1,
+        cornerRadius: 8,
+        displayColors: false,
         callbacks: {
+          title: (context) => {
+            return `Matchweek ${context[0].dataIndex + 1}`;
+          },
           label: (context) => {
             const dataset = context.dataset;
-            const matchweek = context.dataIndex;
+            const matchweek = context.dataIndex + 1;
             const value = context.parsed.y;
-            const matchDetails = dataset.matchDetails[matchweek];
+            const matchDetails = dataset.matchDetails[matchweek - 1];
 
             const positionOrPoints = viewType === 'positions' 
               ? `${value}${getOrdinalSuffix(value)} place`
               : `${value} points`;
 
             if (!matchDetails) {
-              return `${dataset.label}: ${positionOrPoints}`;
+              return [`${dataset.label}`, `Current: ${positionOrPoints}`];
             }
 
-            const venue = matchDetails.isHome ? 'H' : 'A';
+            const venue = matchDetails.isHome ? 'Home' : 'Away';
+            const [teamScore, opponentScore] = matchDetails.score.split('-').map(Number);
+            let resultColor = '#666666';
+
+            if (teamScore > opponentScore) resultColor = '#4CAF50';
+            if (teamScore < opponentScore) resultColor = '#f44336';
+
             return [
-              `${dataset.label}: ${positionOrPoints}`,
-              `${venue} vs ${matchDetails.opponent}: ${matchDetails.score}`
+              dataset.label,
+              `Current: ${positionOrPoints}`,
+              `${venue} vs ${matchDetails.opponent}`,
+              `Result: ${matchDetails.score}`
             ];
           }
         }

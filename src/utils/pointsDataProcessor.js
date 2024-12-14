@@ -29,6 +29,8 @@ export const processPointsData = (matches) => {
     const homeGoals = match.score.fullTime.home;
     const awayGoals = match.score.fullTime.away;
 
+    console.log('Processing match:', { homeTeam, awayTeam, homeGoals, awayGoals }); // Debug log
+
     // Update last played matchweek
     lastPlayedMatchweek[homeTeam] = Math.max(lastPlayedMatchweek[homeTeam], matchweek);
     lastPlayedMatchweek[awayTeam] = Math.max(lastPlayedMatchweek[awayTeam], matchweek);
@@ -45,15 +47,21 @@ export const processPointsData = (matches) => {
 
     teamMatches[homeTeam][matchweek] = {
       opponent: awayTeam,
-      score: `${homeGoals}-${awayGoals}`,
-      isHome: true
+      score: homeGoals !== null && awayGoals !== null ? `${homeGoals}-${awayGoals}` : 'PP',
+      isHome: true,
+      homeGoals,
+      awayGoals
     };
     teamMatches[awayTeam][matchweek] = {
       opponent: homeTeam,
-      score: `${awayGoals}-${homeGoals}`,
-      isHome: false
+      score: homeGoals !== null && awayGoals !== null ? `${awayGoals}-${homeGoals}` : 'PP',
+      isHome: false,
+      homeGoals,
+      awayGoals
     };
   });
+
+  console.log('Processed team matches:', teamMatches); // Debug log
 
   return {
     teamData,

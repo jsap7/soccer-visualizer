@@ -7,36 +7,29 @@ const TeamToggleButton = ({ teamName, logo, isSelected, color, onClick }) => {
       style={{
         backgroundColor: isSelected ? color : '#fff',
         color: isSelected ? '#fff' : '#000',
-        border: `2px solid ${color}`,
-        padding: '8px 12px',
-        borderRadius: '6px',
+        border: `1px solid ${color}`,
+        padding: '6px 12px',
+        borderRadius: '20px',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        width: '100%',
-        fontSize: '14px',
-        fontWeight: '500',
+        fontSize: '13px',
         transition: 'all 0.2s ease',
-        boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
-        justifyContent: 'flex-start'
+        height: '32px',
+        whiteSpace: 'nowrap'
       }}
     >
       <img 
         src={logo} 
         alt="" 
         style={{ 
-          width: '24px', 
-          height: '24px',
+          width: '20px', 
+          height: '20px',
           objectFit: 'contain'
         }} 
       />
-      <span style={{ 
-        flex: 1,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis'
-      }}>
+      <span>
         {teamName.replace(' FC', '')}
       </span>
     </button>
