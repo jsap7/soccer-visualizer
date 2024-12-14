@@ -62,12 +62,24 @@ const TeamStats = ({ matches, selectedTeams }) => {
         cleanSheets: 0,
         matchesPlayed: 0,
         wins: 0,
-        teamLogo: null // Will be set from first match
+        draws: 0,
+        losses: 0,
+        homeWins: 0,
+        awayWins: 0,
+        homeMatches: 0,
+        awayMatches: 0,
+        biggestWin: 0,
+        gamesScored: 0,
+        gamesFailedToScore: 0,
+        teamLogo: null
       };
     });
 
+    // Sort matches chronologically
+    const sortedMatches = [...matches].sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+
     // Process matches to calculate stats
-    matches.forEach(match => {
+    sortedMatches.forEach(match => {
       if (match.status !== 'FINISHED') return;
 
       const homeTeam = match.homeTeam.name;
@@ -75,27 +87,64 @@ const TeamStats = ({ matches, selectedTeams }) => {
       const homeGoals = match.score.fullTime.home;
       const awayGoals = match.score.fullTime.away;
 
-      // Only process stats for selected teams
+      // Process home team stats
       if (selectedTeams.has(homeTeam)) {
-        if (!stats[homeTeam].teamLogo) {
-          stats[homeTeam].teamLogo = match.homeTeam.crest;
+        const team = stats[homeTeam];
+        if (!team.teamLogo) {
+          team.teamLogo = match.homeTeam.crest;
         }
-        stats[homeTeam].goalsFor += homeGoals;
-        stats[homeTeam].goalsAgainst += awayGoals;
-        if (awayGoals === 0) stats[homeTeam].cleanSheets++;
-        if (homeGoals > awayGoals) stats[homeTeam].wins++;
-        stats[homeTeam].matchesPlayed++;
+        
+        team.goalsFor += homeGoals;
+        team.goalsAgainst += awayGoals;
+        team.homeMatches++;
+        team.matchesPlayed++;
+        
+        if (homeGoals > 0) team.gamesScored++;
+        if (homeGoals === 0) team.gamesFailedToScore++;
+        if (awayGoals === 0) team.cleanSheets++;
+        
+        const goalDiff = homeGoals - awayGoals;
+        team.biggestWin = Math.max(team.biggestWin, goalDiff);
+
+        // Record result
+        if (homeGoals > awayGoals) {
+          team.wins++;
+          team.homeWins++;
+        } else if (homeGoals === awayGoals) {
+          team.draws++;
+        } else {
+          team.losses++;
+        }
       }
 
+      // Process away team stats
       if (selectedTeams.has(awayTeam)) {
-        if (!stats[awayTeam].teamLogo) {
-          stats[awayTeam].teamLogo = match.awayTeam.crest;
+        const team = stats[awayTeam];
+        if (!team.teamLogo) {
+          team.teamLogo = match.awayTeam.crest;
         }
-        stats[awayTeam].goalsFor += awayGoals;
-        stats[awayTeam].goalsAgainst += homeGoals;
-        if (homeGoals === 0) stats[awayTeam].cleanSheets++;
-        if (awayGoals > homeGoals) stats[awayTeam].wins++;
-        stats[awayTeam].matchesPlayed++;
+        
+        team.goalsFor += awayGoals;
+        team.goalsAgainst += homeGoals;
+        team.awayMatches++;
+        team.matchesPlayed++;
+        
+        if (awayGoals > 0) team.gamesScored++;
+        if (awayGoals === 0) team.gamesFailedToScore++;
+        if (homeGoals === 0) team.cleanSheets++;
+        
+        const goalDiff = awayGoals - homeGoals;
+        team.biggestWin = Math.max(team.biggestWin, goalDiff);
+
+        // Record result
+        if (awayGoals > homeGoals) {
+          team.wins++;
+          team.awayWins++;
+        } else if (awayGoals === homeGoals) {
+          team.draws++;
+        } else {
+          team.losses++;
+        }
       }
     });
 
@@ -110,7 +159,7 @@ const TeamStats = ({ matches, selectedTeams }) => {
 
   return (
     <div className="mt-8 p-6 bg-white rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Team Rankings</h2>
+      <h2 className="text-2xl font-bold mb-6">Team Statistics</h2>
       <div className="flex flex-wrap gap-8">
         <StatColumn 
           title="Goals Scored" 
@@ -131,21 +180,56 @@ const TeamStats = ({ matches, selectedTeams }) => {
         <StatColumn 
           title="Goals Per Match" 
           teams={teamEntries} 
-          statKey={(stats) => stats.goalsFor / stats.matchesPlayed}
+          statKey={(stats) => stats.goalsFor / (stats.matchesPlayed || 1)}
           formatter={formatDecimal}
         />
         <StatColumn 
           title="Goals Against Per Match" 
           teams={teamEntries} 
-          statKey={(stats) => stats.goalsAgainst / stats.matchesPlayed}
+          statKey={(stats) => stats.goalsAgainst / (stats.matchesPlayed || 1)}
           formatter={formatDecimal}
           isReverse={true}
         />
         <StatColumn 
+          title="Points Per Game" 
+          teams={teamEntries} 
+          statKey={(stats) => (stats.wins * 3 + stats.draws) / (stats.matchesPlayed || 1)}
+          formatter={formatDecimal}
+        />
+        <StatColumn 
           title="Win Rate" 
           teams={teamEntries} 
-          statKey={(stats) => stats.wins / stats.matchesPlayed}
+          statKey={(stats) => stats.wins / (stats.matchesPlayed || 1)}
           formatter={formatPercentage}
+        />
+        <StatColumn 
+          title="Clean Sheet Rate" 
+          teams={teamEntries} 
+          statKey={(stats) => stats.cleanSheets / (stats.matchesPlayed || 1)}
+          formatter={formatPercentage}
+        />
+        <StatColumn 
+          title="Games Scored In" 
+          teams={teamEntries} 
+          statKey={(stats) => stats.gamesScored / (stats.matchesPlayed || 1)}
+          formatter={formatPercentage}
+        />
+        <StatColumn 
+          title="Home Win Rate" 
+          teams={teamEntries} 
+          statKey={(stats) => stats.homeWins / (stats.homeMatches || 1)}
+          formatter={formatPercentage}
+        />
+        <StatColumn 
+          title="Away Win Rate" 
+          teams={teamEntries} 
+          statKey={(stats) => stats.awayWins / (stats.awayMatches || 1)}
+          formatter={formatPercentage}
+        />
+        <StatColumn 
+          title="Biggest Win" 
+          teams={teamEntries} 
+          statKey="biggestWin"
         />
       </div>
     </div>
