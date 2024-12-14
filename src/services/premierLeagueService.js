@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api';
 
 //--------------------------------------------------
 // Calculate Team Statistics
@@ -97,28 +97,22 @@ export const calculateTeamStats = (matches, teamId) => {
 //--------------------------------------------------
 // Fetch Premier League Data
 //--------------------------------------------------
-export const fetchPremierLeagueData = async () => {
-  // Fetch matches data from the API
-  const matchesResponse = await axios.get('/api/v4/competitions/PL/matches');
-  const matches = matchesResponse.data.matches;
+export const fetchMatches = async () => {
+  try {
+    const response = await api.get('/v4/competitions/PL/matches');
+    return response.data.matches;
+  } catch (error) {
+    throw new Error('Failed to fetch matches: ' + error.message);
+  }
+};
 
-  //--------------------------------------------------
-  // Collect Unique Team IDs
-  //--------------------------------------------------
-  const teamIds = new Set();
-  matches.forEach(match => {
-    teamIds.add(match.homeTeam.id);
-    teamIds.add(match.awayTeam.id);
-  });
-
-  //--------------------------------------------------
-  // Calculate and Sort Team Statistics
-  //--------------------------------------------------
-  const teamStats = Array.from(teamIds).map(teamId => 
-    calculateTeamStats(matches, teamId)
-  );
-
-  return sortTeamStats(teamStats);
+export const fetchStandings = async () => {
+  try {
+    const response = await api.get('/v4/competitions/PL/standings');
+    return response.data.standings[0].table;
+  } catch (error) {
+    throw new Error('Failed to fetch standings: ' + error.message);
+  }
 };
 
 //--------------------------------------------------
@@ -132,4 +126,77 @@ export const sortTeamStats = (teamStats) => {
     if (bGD !== aGD) return bGD - aGD;
     return b.goalsFor - a.goalsFor;
   });
+};
+
+const getLastFiveMatches = (matches, teamId) => {
+  const teamMatches = matches
+    .filter(match => 
+      (match.homeTeam.id === teamId || match.awayTeam.id === teamId) &&
+      match.status === 'FINISHED'
+    )
+    .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+    .slice(0, 5);
+
+  return teamMatches.map(match => {
+    const isHome = match.homeTeam.id === teamId;
+    const teamGoals = isHome ? match.score.fullTime.home : match.score.fullTime.away;
+    const opponentGoals = isHome ? match.score.fullTime.away : match.score.fullTime.home;
+
+    if (teamGoals > opponentGoals) return 'W';
+    if (teamGoals < opponentGoals) return 'L';
+    return 'D';
+  }).reverse();
+};
+
+const getNextMatch = (matches, teamId) => {
+  const currentDate = new Date();
+  return matches
+    .filter(match => 
+      (match.homeTeam.id === teamId || match.awayTeam.id === teamId) &&
+      (match.status === 'SCHEDULED' || match.status === 'TIMED') &&
+      new Date(match.utcDate) > currentDate
+    )
+    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))[0];
+};
+
+const getLastMatch = (matches, teamId) => {
+  return matches
+    .filter(match => 
+      (match.homeTeam.id === teamId || match.awayTeam.id === teamId) &&
+      match.status === 'FINISHED'
+    )
+    .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))[0];
+};
+
+export const fetchTableData = async () => {
+  try {
+    // Fetch both standings and matches
+    const [standingsResponse, matchesResponse] = await Promise.all([
+      api.get('/v4/competitions/PL/standings'),
+      api.get('/v4/competitions/PL/matches')
+    ]);
+
+    const standings = standingsResponse.data.standings[0].table;
+    const matches = matchesResponse.data.matches;
+
+    // Enhance standings with form and match data
+    const enhancedStandings = standings.map(team => ({
+      ...team,
+      form: getLastFiveMatches(matches, team.team.id),
+      formMatches: matches
+        .filter(m => 
+          (m.homeTeam.id === team.team.id || m.awayTeam.id === team.team.id) &&
+          m.status === 'FINISHED'
+        )
+        .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+        .slice(0, 5)
+        .reverse(),
+      lastMatch: getLastMatch(matches, team.team.id),
+      nextMatch: getNextMatch(matches, team.team.id)
+    }));
+
+    return enhancedStandings;
+  } catch (error) {
+    throw new Error('Failed to fetch table data: ' + error.message);
+  }
 }; 

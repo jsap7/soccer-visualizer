@@ -160,7 +160,9 @@ const TrendIndicator = ({ form }) => {
   );
 };
 
-const FormIndicator = ({ form, formMatches, teamId, position }) => {
+const FormIndicator = ({ form = [], formMatches = [], teamId, position }) => {
+  if (!Array.isArray(form)) return null;
+  
   return (
     <div className="flex items-center justify-center">
       <div className="flex items-center justify-center gap-0.5">

@@ -10,13 +10,13 @@ import {
   Legend
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import axios from 'axios';
 import TeamSelector from './chart-components/TeamSelector';
 import TeamStats from './TeamStats';
 import { teamColors } from './chart-components/constants';
 import { processMatchData } from '../utils/chartDataProcessor';
 import { processPointsData } from '../utils/pointsDataProcessor';
 import { processPositionsData } from '../utils/positionsDataProcessor';
+import { fetchMatches } from '../services/premierLeagueService';
 
 // Register ChartJS components
 ChartJS.register(
@@ -40,10 +40,15 @@ const DataChart = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const matchesResponse = await axios.get('/api/v4/competitions/PL/matches');
-        const matches = matchesResponse.data.matches;
-        setMatches(matches);
+        setError(null);
+        setLoading(true);
+        const matches = await fetchMatches();
         
+        if (!matches) {
+          throw new Error('No match data received');
+        }
+        
+        setMatches(matches);
         const basicData = processMatchData(matches);
         const pointsData = processPointsData(matches);
         const positionsData = processPositionsData(matches);
@@ -53,10 +58,10 @@ const DataChart = () => {
           points: pointsData,
           positions: positionsData
         });
-        setLoading(false);
       } catch (err) {
         console.error('Error loading chart data:', err);
-        setError('Failed to load chart data');
+        setError(err.message || 'Failed to load chart data');
+      } finally {
         setLoading(false);
       }
     };

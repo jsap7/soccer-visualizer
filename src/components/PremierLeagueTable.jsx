@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { fetchPremierLeagueData } from '../services/premierLeagueService';
 import { TEXT_SIZES, FONT_WEIGHTS, COLORS } from './table-components/constants';
 import FormIndicator from './table-components/FormIndicator';
 import TeamCell from './table-components/TeamCell';
 import MatchCell from './table-components/MatchCell';
 import Legend from './table-components/Legend';
 import TableHeader from './table-components/TableHeader';
+import { fetchTableData } from '../services/premierLeagueService';
 
 const PremierLeagueTable = () => {
   const [tableData, setTableData] = useState([]);
@@ -15,12 +15,19 @@ const PremierLeagueTable = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await fetchPremierLeagueData();
+        setError(null);
+        setLoading(true);
+        const data = await fetchTableData();
+        
+        if (!data) {
+          throw new Error('No table data received');
+        }
+        
         setTableData(data);
-        setLoading(false);
       } catch (err) {
-        console.error('API Error:', err);
-        setError('Failed to fetch data: ' + (err.response?.data?.message || err.message));
+        console.error('Error loading table:', err);
+        setError(err.message || 'Failed to load table data');
+      } finally {
         setLoading(false);
       }
     };
@@ -74,9 +81,9 @@ const PremierLeagueTable = () => {
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
                       <TeamCell team={team.team} />
                     </td>
-                    <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.played}</td>
+                    <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.playedGames}</td>
                     <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.won}</td>
-                    <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.drawn}</td>
+                    <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.draw}</td>
                     <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.lost}</td>
                     <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.goalsFor}</td>
                     <td className="px-4 py-3 text-center border-r ${COLORS.divider}">{team.goalsAgainst}</td>
@@ -84,8 +91,8 @@ const PremierLeagueTable = () => {
                     <td className={`px-4 py-3 text-center ${FONT_WEIGHTS.bold} border-r ${COLORS.divider}`}>{team.points}</td>
                     <td className="px-4 py-3 border-r ${COLORS.divider}">
                       <FormIndicator 
-                        form={team.form} 
-                        formMatches={team.formMatches} 
+                        form={team.form}
+                        formMatches={team.formMatches}
                         teamId={team.team.id}
                         position={position}
                       />
