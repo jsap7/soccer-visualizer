@@ -1,14 +1,11 @@
 import axios from 'axios';
 
-const isDevelopment = import.meta.env.DEV;
 const MAX_RETRIES = 3;
 
 const api = axios.create({
-  baseURL: isDevelopment ? '/api' : 'https://api.football-data.org',
+  baseURL: '/api',
   headers: {
-    'X-Auth-Token': isDevelopment 
-      ? undefined 
-      : import.meta.env.VITE_API_KEY
+    'Content-Type': 'application/json'
   }
 });
 
