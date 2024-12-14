@@ -11,6 +11,11 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import axios from 'axios';
+import TeamSelector from './chart-components/TeamSelector';
+import { teamColors } from './chart-components/constants';
+import { processMatchData } from '../utils/chartDataProcessor';
+import { processPointsData } from '../utils/pointsDataProcessor';
+import { processPositionsData } from '../utils/positionsDataProcessor';
 
 // Register ChartJS components
 ChartJS.register(
@@ -23,112 +28,28 @@ ChartJS.register(
   Legend
 );
 
-// Team colors mapping with official club colors
-const teamColors = {
-  'Liverpool FC': '#C8102E',
-  'Chelsea FC': '#034694',
-  'Arsenal FC': '#EF0107',
-  'Manchester City FC': '#6CABDD',
-  'Nottingham Forest FC': '#E53233',
-  'Aston Villa FC': '#670E36',
-  'Brighton & Hove Albion FC': '#0057B8',
-  'AFC Bournemouth': '#DA291C',
-  'Brentford FC': '#E30613',
-  'Fulham FC': '#CC0000',
-  'Tottenham Hotspur FC': '#132257',
-  'Newcastle United FC': '#241F20',
-  'Manchester United FC': '#DA291C',
-  'West Ham United FC': '#7A263A',
-  'Everton FC': '#003399',
-  'Leicester City FC': '#003090',
-  'Crystal Palace FC': '#1B458F',
-  'Ipswich Town FC': '#0033A0',
-  'Wolverhampton Wanderers FC': '#FDB913',
-  'Southampton FC': '#D71920'
-};
-
 const DataChart = () => {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedTeams, setSelectedTeams] = useState(new Set());
+  const [viewType, setViewType] = useState('points');
 
   useEffect(() => {
-    const processMatchData = (matches) => {
-      const teamData = {};
-      const teamMatches = {};
-      const lastPlayedMatchweek = {};
-      const teamLogos = {};
-
-      // Initialize team data
-      matches.forEach(match => {
-        [match.homeTeam, match.awayTeam].forEach(team => {
-          if (!teamData[team.name]) {
-            teamData[team.name] = {
-              points: Array(38).fill(0)
-            };
-            teamMatches[team.name] = Array(38).fill(null);
-            lastPlayedMatchweek[team.name] = 0;
-            teamLogos[team.name] = team.crest;
-          }
-        });
-      });
-
-      // Sort matches chronologically
-      const sortedMatches = matches.sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
-
-      // Process each match
-      sortedMatches.forEach(match => {
-        if (match.status !== 'FINISHED') return;
-
-        const matchweek = match.matchday - 1;
-        const homeTeam = match.homeTeam.name;
-        const awayTeam = match.awayTeam.name;
-        const homeGoals = match.score.fullTime.home;
-        const awayGoals = match.score.fullTime.away;
-
-        // Update last played matchweek
-        lastPlayedMatchweek[homeTeam] = Math.max(lastPlayedMatchweek[homeTeam], matchweek);
-        lastPlayedMatchweek[awayTeam] = Math.max(lastPlayedMatchweek[awayTeam], matchweek);
-
-        // Calculate match points
-        const homePoints = match.score.winner === 'HOME_TEAM' ? 3 : match.score.winner === 'DRAW' ? 1 : 0;
-        const awayPoints = match.score.winner === 'AWAY_TEAM' ? 3 : match.score.winner === 'DRAW' ? 1 : 0;
-
-        // Update cumulative points for this matchweek and carry forward
-        for (let week = matchweek; week < 38; week++) {
-          teamData[homeTeam].points[week] = (teamData[homeTeam].points[week - 1] || 0) + homePoints;
-          teamData[awayTeam].points[week] = (teamData[awayTeam].points[week - 1] || 0) + awayPoints;
-        }
-
-        // Store match details for tooltips
-        teamMatches[homeTeam][matchweek] = {
-          opponent: awayTeam,
-          score: `${homeGoals}-${awayGoals}`,
-          isHome: true
-        };
-        teamMatches[awayTeam][matchweek] = {
-          opponent: homeTeam,
-          score: `${awayGoals}-${homeGoals}`,
-          isHome: false
-        };
-      });
-
-      return {
-        teams: Object.keys(teamData).sort(),
-        teamData,
-        teamMatches,
-        lastPlayedMatchweek,
-        teamLogos
-      };
-    };
-
     const loadData = async () => {
       try {
         const matchesResponse = await axios.get('/api/v4/competitions/PL/matches');
         const matches = matchesResponse.data.matches;
-        const processedData = processMatchData(matches);
-        setChartData(processedData);
+        
+        const basicData = processMatchData(matches);
+        const pointsData = processPointsData(matches);
+        const positionsData = processPositionsData(matches);
+        
+        setChartData({
+          ...basicData,
+          points: pointsData,
+          positions: positionsData
+        });
         setLoading(false);
       } catch (err) {
         console.error('Error loading chart data:', err);
@@ -141,7 +62,6 @@ const DataChart = () => {
   }, []);
 
   useEffect(() => {
-    // When chartData is loaded, initialize selectedTeams with all teams
     if (chartData && selectedTeams.size === 0) {
       setSelectedTeams(new Set(chartData.teams));
     }
@@ -162,13 +82,17 @@ const DataChart = () => {
             const value = context.parsed.y;
             const matchDetails = dataset.matchDetails[matchweek];
 
+            const positionOrPoints = viewType === 'positions' 
+              ? `${value}${getOrdinalSuffix(value)} place`
+              : `${value} points`;
+
             if (!matchDetails) {
-              return `${dataset.label}: ${value} points`;
+              return `${dataset.label}: ${positionOrPoints}`;
             }
 
             const venue = matchDetails.isHome ? 'H' : 'A';
             return [
-              `${dataset.label}: ${value} points`,
+              `${dataset.label}: ${positionOrPoints}`,
               `${venue} vs ${matchDetails.opponent}: ${matchDetails.score}`
             ];
           }
@@ -178,27 +102,36 @@ const DataChart = () => {
     scales: {
       y: {
         display: true,
-        beginAtZero: true,
+        reverse: viewType === 'positions',
+        min: viewType === 'positions' ? 1 : 0,
+        max: viewType === 'positions' ? 20 : undefined,
+        position: 'left',
         ticks: {
-          display: true,
-          color: '#666',
-          stepSize: 5,
+          stepSize: 1,
+          autoSkip: false,
+          maxRotation: 0,
+          font: {
+            size: 12
+          },
+          padding: 10,
+          z: 1,
           callback: function(value) {
-            return Number.isInteger(value) ? value : '';
+            if (!Number.isInteger(value)) return '';
+            if (viewType === 'positions') {
+              return value >= 1 && value <= 20 ? `${value}${getOrdinalSuffix(value)}` : '';
+            }
+            return value;
           }
         },
         grid: {
           display: true,
-          color: 'rgba(0, 0, 0, 0.1)'
+          drawBorder: true,
+          drawOnChartArea: true,
+          drawTicks: true
         },
-        title: {
+        border: {
           display: true,
-          text: 'Points',
-          color: '#666',
-          font: {
-            size: 14,
-            weight: 'bold'
-          }
+          width: 1
         }
       },
       x: {
@@ -223,27 +156,21 @@ const DataChart = () => {
     },
     layout: {
       padding: {
-        top: 50,
-        bottom: 50,
-        left: 50,
-        right: 20
+        top: 20,
+        bottom: 20,
+        left: 60,
+        right: 60
       }
-    }
+    },
+    clip: false
   });
 
   const getChartData = () => {
     if (!chartData) return null;
 
-    const { teams, teamData, teamMatches, lastPlayedMatchweek, teamLogos } = chartData;
-
-    // Function to find teams with same points at a given week
-    const findTiedTeams = (week, points) => {
-      if (points === null) return [];
-      return teams.filter(team => 
-        teamData[team].points[week] === points && 
-        lastPlayedMatchweek[team] >= week
-      );
-    };
+    const { teams, teamLogos } = chartData;
+    const currentData = chartData[viewType];
+    const { teamData, teamMatches, lastPlayedMatchweek } = currentData;
 
     return {
       labels: Array.from({ length: 38 }, (_, i) => i + 1),
@@ -255,26 +182,14 @@ const DataChart = () => {
           const logoImage = new Image(20, 20);
           logoImage.src = teamLogos[teamName];
 
-          const dataPoints = teamData[teamName].points.map((points, week) => {
-            if (week > lastPlayedWeek || points === null) return null;
-            
-            // Only adjust x position for the last point if there are ties
-            if (week === lastPlayedWeek) {
-              const tiedTeams = findTiedTeams(week, points);
-              if (tiedTeams.length > 1) {
-                const tiedIndex = tiedTeams.indexOf(teamName);
-                const offset = (tiedIndex - (tiedTeams.length - 1) / 2) * 0.3;
-                return {
-                  x: week + 1 + offset,
-                  y: points
-                };
-              }
-            }
-            return {
-              x: week + 1,
-              y: points
-            };
-          }).filter(point => point !== null);
+          const dataPoints = teamData[teamName][viewType === 'points' ? 'points' : 'positions']
+            .map((value, week) => {
+              if (week > lastPlayedWeek || value === null) return null;
+              return {
+                x: week + 1,
+                y: value
+              };
+            }).filter(point => point !== null);
 
           return {
             label: teamName,
@@ -319,13 +234,15 @@ const DataChart = () => {
   };
 
   const handleTeamToggle = (teamName) => {
-    const newSelectedTeams = new Set(selectedTeams);
-    if (newSelectedTeams.has(teamName)) {
-      newSelectedTeams.delete(teamName);
-    } else {
-      newSelectedTeams.add(teamName);
-    }
-    setSelectedTeams(newSelectedTeams);
+    setSelectedTeams(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(teamName)) {
+        newSet.delete(teamName);
+      } else {
+        newSet.add(teamName);
+      }
+      return newSet;
+    });
   };
 
   const handleSelectAll = () => {
@@ -338,123 +255,79 @@ const DataChart = () => {
     setSelectedTeams(new Set());
   };
 
+  const ViewSelector = () => (
+    <div style={{ marginBottom: '20px' }}>
+      <button
+        onClick={() => setViewType('points')}
+        style={{
+          backgroundColor: viewType === 'points' ? '#4CAF50' : '#fff',
+          color: viewType === 'points' ? '#fff' : '#000',
+          padding: '8px 16px',
+          marginRight: '10px',
+          border: '1px solid #4CAF50',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Points
+      </button>
+      <button
+        onClick={() => setViewType('positions')}
+        style={{
+          backgroundColor: viewType === 'positions' ? '#4CAF50' : '#fff',
+          color: viewType === 'positions' ? '#fff' : '#000',
+          padding: '8px 16px',
+          border: '1px solid #4CAF50',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }}
+      >
+        Positions
+      </button>
+    </div>
+  );
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>{error}</div>;
   if (!chartData) return null;
 
   return (
-    <div className="chart-container" style={{ height: '80vh', width: '100%', padding: '20px' }}>
-      <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>League Points Progression</h2>
-      <div style={{ height: 'calc(100% - 160px)', marginBottom: '20px' }}>
+    <div className="chart-container" style={{ 
+      height: '80vh', 
+      width: '100%', 
+      padding: '20px',
+      marginLeft: '20px'  // Add margin to prevent cutoff
+    }}>
+      <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>
+        League {viewType === 'points' ? 'Points' : 'Positions'} Progression
+      </h2>
+      <ViewSelector />
+      <div style={{ 
+        height: 'calc(100% - 160px)', 
+        marginBottom: '20px',
+        marginLeft: '20px'  // Add margin to prevent cutoff
+      }}>
         <Line options={getChartOptions()} data={getChartData()} />
       </div>
-      <div className="team-toggles" style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        gap: '10px',
-        padding: '15px',
-        background: '#f5f5f5',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        {chartData.teams.sort().map(teamName => (
-          <button
-            key={teamName}
-            onClick={() => handleTeamToggle(teamName)}
-            style={{
-              backgroundColor: selectedTeams.has(teamName) ? teamColors[teamName] : '#fff',
-              color: selectedTeams.has(teamName) ? '#fff' : '#000',
-              border: `2px solid ${teamColors[teamName]}`,
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              width: '100%',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'all 0.2s ease',
-              boxShadow: selectedTeams.has(teamName) ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
-              justifyContent: 'flex-start'
-            }}
-          >
-            <img 
-              src={chartData.teamLogos[teamName]} 
-              alt="" 
-              style={{ 
-                width: '24px', 
-                height: '24px',
-                objectFit: 'contain'
-              }} 
-            />
-            <span style={{ 
-              flex: 1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {teamName.replace(' FC', '')}
-            </span>
-          </button>
-        ))}
-        <button
-          onClick={handleSelectAll}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '6px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            width: '100%'
-          }}
-        >
-          <span style={{ 
-            flex: 1,
-            textAlign: 'center'
-          }}>
-            Select All Teams
-          </span>
-        </button>
-        <button
-          onClick={handleClearAll}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '6px',
-            backgroundColor: '#f44336',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            width: '100%'
-          }}
-        >
-          <span style={{ 
-            flex: 1,
-            textAlign: 'center'
-          }}>
-            Clear All Teams
-          </span>
-        </button>
-      </div>
+      <TeamSelector
+        teams={chartData.teams}
+        selectedTeams={selectedTeams}
+        teamLogos={chartData.teamLogos}
+        onTeamToggle={handleTeamToggle}
+        onSelectAll={handleSelectAll}
+        onClearAll={handleClearAll}
+      />
     </div>
   );
+};
+
+const getOrdinalSuffix = (number) => {
+  const j = number % 10;
+  const k = number % 100;
+  if (j === 1 && k !== 11) return 'st';
+  if (j === 2 && k !== 12) return 'nd';
+  if (j === 3 && k !== 13) return 'rd';
+  return 'th';
 };
 
 export default DataChart; 

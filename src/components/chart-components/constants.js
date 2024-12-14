@@ -1,0 +1,22 @@
+export const teamColors = {
+  'Liverpool FC': '#C8102E',
+  'Chelsea FC': '#034694',
+  'Arsenal FC': '#EF0107',
+  'Manchester City FC': '#6CABDD',
+  'Nottingham Forest FC': '#E53233',
+  'Aston Villa FC': '#670E36',
+  'Brighton & Hove Albion FC': '#0057B8',
+  'AFC Bournemouth': '#DA291C',
+  'Brentford FC': '#E30613',
+  'Fulham FC': '#CC0000',
+  'Tottenham Hotspur FC': '#132257',
+  'Newcastle United FC': '#241F20',
+  'Manchester United FC': '#DA291C',
+  'West Ham United FC': '#7A263A',
+  'Everton FC': '#003399',
+  'Leicester City FC': '#003090',
+  'Crystal Palace FC': '#1B458F',
+  'Ipswich Town FC': '#0033A0',
+  'Wolverhampton Wanderers FC': '#FDB913',
+  'Southampton FC': '#D71920'
+}; 
